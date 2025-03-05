@@ -1,0 +1,10 @@
+[windows25]
+windows_node ansible_host={{ ip_for_node }}
+
+[windows25:vars]
+ansible_user={{ user }}
+ansible_password= {{ password }} 
+ansible_connection=winrm 
+ansible_winrm_transport=ntlm 
+ansible_winrm_server_cert_validation=ignore 
+ansible_winrm_port=5985
