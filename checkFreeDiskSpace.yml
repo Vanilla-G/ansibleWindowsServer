@@ -1,0 +1,30 @@
+---
+- name: check free disk space
+  hosts: all
+  tasks:
+    - name: "Check free space in C:"
+      win_shell: "write-host ([math]::Round((Get-PSDrive C | Select-Object Free).free / 1024 / 1024 / 1024,2))"
+      register: freespace
+      changed_when: false
+
+    - name: Report current free disk space
+      debug:
+        msg: "Current free disk space on {{ inventory_hostname }}: {{ freespace.stdout }} GB"
+
+    - name: Check if disk space is below threshold
+      block:
+        - name: Prepare failure message
+          set_fact:
+            disk_space_message: >-
+              VM {{ inventory_hostname }} has insufficient disk space. 
+              Current free space is {{ freespace.stdout }} GB, 
+              which is below the required 20 GB threshold.
+
+        - name: Output detailed disk space warning
+          debug:
+            msg: "{{ disk_space_message }}"
+
+        - name: Fail play if disk space is insufficient
+          fail:
+            msg: "{{ disk_space_message }}"
+      when: freespace.stdout | float < 20.0
