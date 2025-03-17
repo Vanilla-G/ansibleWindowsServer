@@ -1,0 +1,7 @@
+---
+- name: Ping King
+  hosts: all
+  #gather_facts: no
+  tasks:
+    - name: Test connectivity with Windows
+      win_ping:
