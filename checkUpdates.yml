@@ -1,0 +1,20 @@
+---
+- name: windows server patching
+  hosts: all
+  tasks:
+    - name: Check for missing updates
+      win_updates:
+        state: searched
+        category_names: "*"  # Include all categories
+      register: update_results
+
+    - name: report update results
+      debug:
+        msg: |
+          {% for k in update_results.updates %}
+          {{ k.title }}
+          {% endfor %}
+    
+    - name: Debug full update_results
+      debug:
+        var: update_results
