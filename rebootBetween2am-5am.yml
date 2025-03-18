@@ -14,40 +14,16 @@
         reboot: no
         log_path: c:\temp\patching.txt
       register: update_result
-      until: update_result.found_update_count == 0
+      until: update_result.found_update_count == 0 or update_result.reboot_required
       retries: 5
       delay: 30
 
     - name: Check if a reboot is required
-      win_shell: |
-        $results = @{'needs_reboot'=$false ; 'reason'=@()}
-        $regpath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"
-        if (Get-ChildItem -Path $regpath -ErrorAction Ignore) {
-          $results['needs_reboot']=$true
-          $results['reason']+='Component Based Servicing'
-        }
-        $regpath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"
-        if (Get-Item -Path $regpath -ErrorAction Ignore) {
-          $results['needs_reboot']=$true
-          $results['reason']+='WindowsUpdate'
-        }
-        try {
-          $util = [wmiclass]"\\.\root\ccm\clientsdk:CCM_ClientUtilities"
-          $status = $util.DetermineIfRebootPending()
-          if(($status -ne $null) -and $status.RebootPending){
-            $results['needs_reboot']=$true
-            $results['reason']+='CCM_RebootPending'
-          }
-        } catch{}
-        return $results | ConvertTo-Json
-      register: needs_reboot
-
-    - name: Store reboot requirement for later use
-      set_fact:
-        needs_reboot: "{{ needs_reboot.stdout.needs_reboot | default(false) }}"
+      ansible.builtin.set_fact:
+        needs_reboot: "{{ update_result.reboot_required }}"
 
     - name: Debug output of reboot requirement
-      debug:
+      ansible.builtin.debug:
         var: needs_reboot
 
     - name: Get current hour
@@ -65,12 +41,22 @@
         - current_hour.stdout | int >= 2
         - current_hour.stdout | int < 5
 
-    - name: Re-run Windows Patching after reboot (if needed)
+    - name: Wait for system to be online after reboot
+      wait_for_connection:
+        delay: 60
+        timeout: 600
+      when: needs_reboot | bool
+
+    - name: Run Windows Patching Again After Reboot
       ansible.windows.win_updates:
         category_names: "*"
         reboot: no
         log_path: c:\temp\patching_after_reboot.txt
       register: post_reboot_update_result
-      until: post_reboot_update_result.found_update_count == 0
+      until: post_reboot_update_result.found_update_count == 0 or post_reboot_update_result.reboot_required
       retries: 5
       delay: 30
+
+    - name: Reboot Again If Needed
+      ansible.windows.win_reboot:
+      when: post_reboot_update_result.reboot_required | bool
