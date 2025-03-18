@@ -19,6 +19,15 @@
       ansible.builtin.set_fact:
         reboot_needed: "{{ update_result.reboot_required | default(false) }}"
 
+    - name: Ask for reboot confirmation (optional)
+      ansible.builtin.pause:
+        prompt: "Do you want to reboot now? (yes/no)"
+      register: reboot_confirmation
+
+    - name: Set confirm_reboot based on user input
+      ansible.builtin.set_fact:
+        confirm_reboot: "{{ reboot_confirmation.user_input == 'yes' }}"
+
     - name: Write reboot status to a log file
       ansible.windows.win_shell: |
         echo "Reboot required: {{ reboot_needed }}" >> C:\temp\patching_status.log
