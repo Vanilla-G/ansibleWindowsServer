@@ -1,0 +1,4 @@
+---
+- import_playbook: checkFreeDiskSpace.yml
+- import_playbook: checkUpdates.yml
+- import_playbook: windowsUpdateAll.yml
