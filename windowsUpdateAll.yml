@@ -1,44 +1,49 @@
 ---
-- name: Install Windows Updates 
+- name: Install Windows Updates (Fully Automated)
   hosts: all
   tasks:
+
     - name: Create log directory
       ansible.windows.win_file:
         path: C:\temp
         state: directory
 
-    - name: Install Windows Updates (No Auto Reboot)
-      ansible.windows.win_updates:
-        category_names: "*"
-        reboot: no  # Do NOT reboot automatically
-        log_path: C:\temp\patching.txt
-      register: update_result
-      ignore_errors: true  # Prevent playbook failure if reboot is needed
+    # 🚀 Loop through updates and reboots until fully patched
+    - name: Run Windows Updates and Reboot as Needed
+      block:
+        - name: Install Windows Updates (No Auto Reboot)
+          ansible.windows.win_updates:
+            category_names: "*"
+            reboot: no  # Do NOT reboot automatically
+            log_path: C:\temp\patching.txt
+          register: update_result
+          ignore_errors: true  # Prevent failure if reboot is needed
 
-    - name: Check if a reboot is required
-      ansible.builtin.set_fact:
-        reboot_needed: "{{ update_result.reboot_required | default(false) }}"
+        - name: Check if a reboot is required
+          ansible.builtin.set_fact:
+            reboot_needed: "{{ update_result.reboot_required | default(false) }}"
 
-    - name: Ask for reboot confirmation (optional)
-      ansible.builtin.pause:
-        prompt: "Do you want to reboot now? (yes/no)"
-      register: reboot_confirmation
+        - name: Write reboot status to a log file
+          ansible.windows.win_shell: |
+            echo "Reboot required: {{ reboot_needed }}" >> C:\temp\patching_status.log
+          when: reboot_needed
 
-    - name: Set confirm_reboot based on user input
-      ansible.builtin.set_fact:
-        confirm_reboot: "{{ reboot_confirmation.user_input == 'yes' }}"
+        - name: Notify administrators if a reboot is required
+          ansible.builtin.debug:
+            msg: "🚨 Reboot required on {{ inventory_hostname }}! Check C:/temp/patching_status.log"
+          when: reboot_needed
 
-    - name: Write reboot status to a log file
-      ansible.windows.win_shell: |
-        echo "Reboot required: {{ reboot_needed }}" >> C:\temp\patching_status.log
-      when: reboot_needed
+        - name: Automatically trigger a reboot if required
+          ansible.windows.win_reboot:
+            reboot_timeout: 1800  # 30 minutes
+          when: reboot_needed
 
-    - name: Notify administrators if a reboot is required
-      ansible.builtin.debug:
-        msg: "🚨 Reboot required on {{ inventory_hostname }}! Check C:/temp/patching_status.log"
-      when: reboot_needed
+        - name: Wait for system to be online after reboot
+          wait_for_connection:
+            delay: 60
+            timeout: 600
+          when: reboot_needed
 
-    - name: Manually trigger a reboot (Optional)
-      ansible.windows.win_reboot:
-        reboot_timeout: 1800  # 30 minutes
-      when: reboot_needed and confirm_reboot | default(false)
+      until: update_result.found_update_count == 0 and not update_result.reboot_required
+      retries: 5  # ⛔ Prevents infinite loop
+      delay: 60
