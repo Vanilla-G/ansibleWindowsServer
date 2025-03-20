@@ -7,8 +7,8 @@
       ansible.windows.win_file:
         path: c:\temp
         state: directory
+      # This task creates a directory at C:\temp to store the log files generated during the update process.
 
-    # Check if a reboot is required BEFORE starting updates
     - name: Check if a reboot is pending before running updates
       win_shell: |
         $rebootRequired = $false
@@ -20,23 +20,25 @@
         }
         Write-Output $rebootRequired
       register: pre_update_reboot_check
+      # This task checks for specific registry keys to determine if a reboot is required before applying updates.
 
     - name: Debug Output - Reboot Required Before Updates?
       ansible.builtin.debug:
         var: pre_update_reboot_check.stdout
+      # This task outputs the result of the previous check to the console for debugging purposes.
 
-    # Reboot IMMEDIATELY if required before running updates
     - name: Reboot if required before patching
       ansible.windows.win_reboot:
       when: pre_update_reboot_check.stdout | bool
+      # This task reboots the system immediately if a reboot is required before applying updates.
 
     - name: Wait for system to be online after reboot
       wait_for_connection:
         delay: 60
         timeout: 600
       when: pre_update_reboot_check.stdout | bool
+      # This task waits for the system to come back online after the reboot, with a delay of 60 seconds and a timeout of 600 seconds.
 
-    # Run Updates Until No More Are Found OR A Reboot Is Required
     - name: Start Windows Patching
       ansible.windows.win_updates:
         category_names: "*"
@@ -44,40 +46,45 @@
         log_path: c:\temp\patching.txt
       register: update_result
       until: update_result.found_update_count == 0 or not update_result.reboot_required
-      retries: 3   # Prevents infinite loop by limiting retries
+      retries: 3
       delay: 30
+      # This task applies all available updates, logs the results to C:\temp\patching.txt, and retries up to 3 times with a 30-second delay if more updates are found or a reboot is required.
 
     - name: Check if a reboot is required after patching
       ansible.builtin.set_fact:
         needs_reboot: "{{ update_result.reboot_required }}"
+      # This task sets a fact to indicate whether a reboot is required after the updates have been applied.
 
     - name: Debug output of reboot requirement
       ansible.builtin.debug:
         var: needs_reboot
+      # This task outputs the result of the reboot requirement check to the console for debugging purposes.
 
     - name: Get current hour
       win_shell: (Get-Date).Hour
       register: current_hour
+      # This task retrieves the current hour of the day using PowerShell and registers the result.
 
     - name: Debug output of current hour
       debug:
         var: current_hour.stdout
+      # This task outputs the current hour to the console for debugging purposes.
 
-    # Reboot if required (ONLY inside the maintenance window)
     - name: Reboot if required (only during maintenance window)
       ansible.windows.win_reboot:
       when: 
         - needs_reboot | bool
         - current_hour.stdout | int >= 2
         - current_hour.stdout | int < 22
+      # This task reboots the system if a reboot is required and the current time is within the maintenance window (between 2 AM and 10 PM).
 
     - name: Wait for system to be online after reboot
       wait_for_connection:
         delay: 60
         timeout: 600
       when: needs_reboot | bool
+      # This task waits for the system to come back online after the reboot, with a delay of 60 seconds and a timeout of 600 seconds.
 
-    # Run updates one last time after reboot (if needed)
     - name: Run Windows Patching Again After Reboot
       ansible.windows.win_updates:
         category_names: "*"
@@ -85,9 +92,11 @@
         log_path: c:\temp\patching_after_reboot.txt
       register: post_reboot_update_result
       until: post_reboot_update_result.found_update_count == 0 or not post_reboot_update_result.reboot_required
-      retries: 2  # Prevents infinite loop
+      retries: 2
       delay: 30
+      # This task applies updates again after a reboot if needed, logs the results to C:\temp\patching_after_reboot.txt, and retries up to 2 times with a 30-second delay if more updates are found or a reboot is required.
 
     - name: Reboot Again If Needed
       ansible.windows.win_reboot:
       when: post_reboot_update_result.reboot_required | bool
+      # This task reboots the system again if required after the second round of updates.
