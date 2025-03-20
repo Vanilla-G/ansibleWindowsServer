@@ -7,6 +7,8 @@
       ansible.windows.win_file:
         path: C:\temp
         state: directory
+      # This task ensures that the 'C:\temp' directory exists on the Windows server.
+      # It's necessary to create this directory so that we can store the log files of the update process.
 
     # Loop through updates and reboots until fully patched
     - name: Run Windows Updates Until No More Are Found
@@ -18,28 +20,46 @@
       until: update_result.found_update_count == 0 and not update_result.reboot_required
       retries: 5  # Prevents infinite loop
       delay: 60
+      # This task runs Windows Update and logs the results to 'C:\temp\patching.txt'.
+      # It will keep checking for updates and installing them until no more updates are found.
+      # The task will retry up to 5 times, with a 60-second delay between attempts, to avoid an infinite loop.
+      # Reboots are not performed automatically during this task.
 
     - name: Check if a reboot is required
       ansible.builtin.set_fact:
         reboot_needed: "{{ update_result.reboot_required | default(false) }}"
+      # This task sets a variable 'reboot_needed' based on whether a reboot is required after the updates.
+      # It checks the 'update_result' for the 'reboot_required' flag and defaults to 'false' if not set.
 
     - name: Write reboot status to a log file
       ansible.windows.win_shell: |
         echo "Reboot required: {{ reboot_needed }}" >> C:\temp\patching_status.log
       when: reboot_needed
+      # This task writes the reboot status to the 'C:\temp\patching_status.log' file.
+      # It appends the message "Reboot required: true/false" to the log file.
+      # This task only runs if a reboot is needed.
 
     - name: Notify administrators if a reboot is required
       ansible.builtin.debug:
         msg: "****** Reboot required on {{ inventory_hostname }}! Check C:/temp/patching_status.log"
       when: reboot_needed
+      # This task sends a debug message to notify administrators if a reboot is required.
+      # The message includes the hostname of the server and directs administrators to check the log file.
+      # This task only runs if a reboot is needed.
 
     - name: Automatically trigger a reboot if required
       ansible.windows.win_reboot:
         reboot_timeout: 1800  # 30 minutes
       when: reboot_needed
+      # This task automatically triggers a reboot of the server if required.
+      # It waits for up to 30 minutes (1800 seconds) for the reboot to complete.
+      # This task only runs if a reboot is needed.
 
     - name: Wait for system to be online after reboot
       wait_for_connection:
         delay: 60
         timeout: 600
       when: reboot_needed
+      # This task waits for the system to become available again after a reboot.
+      # It delays for 60 seconds before starting to check and will timeout after 10 minutes (600 seconds).
+      # This task only runs if a reboot is needed.
