@@ -8,6 +8,8 @@
       win_shell: "write-host ([math]::Round((Get-PSDrive C | Select-Object Free).free / 1024 / 1024 / 1024,2))"
       register: freespace
       changed_when: false
+      failed_when: freespace.stdout is undefined
+
 
     - name: Report current free disk space
       # This task outputs the current free disk space on the host to the Ansible console.
