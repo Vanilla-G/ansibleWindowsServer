@@ -7,6 +7,8 @@
         state: searched
         category_names: "*"  # Include all categories
       register: update_results
+      # This task uses the win_updates module to search for all missing updates on the Windows server.
+      # It registers the results in the variable 'update_results' for further use.
 
     - name: report update results
       debug:
@@ -14,7 +16,11 @@
           {% for k in update_results.updates %}
           {{ k.title }}
           {% endfor %}
-    
+      # This task uses the debug module to output the titles of all the updates found.
+      # It iterates through the 'update_results.updates' list and prints each update's title.
+
     - name: Debug full update_results
       debug:
         var: update_results
+      # This task uses the debug module to output the entire 'update_results' variable.
+      # It provides a detailed view of the update results, including all metadata and information about the updates found.
