@@ -3,17 +3,22 @@
   hosts: all
   tasks:
     - name: "Check free space in C:"
+      # This task runs a PowerShell command to check the free disk space on the C: drive.
+      # The result is stored in the 'freespace' variable.
       win_shell: "write-host ([math]::Round((Get-PSDrive C | Select-Object Free).free / 1024 / 1024 / 1024,2))"
       register: freespace
       changed_when: false
 
     - name: Report current free disk space
+      # This task outputs the current free disk space on the host to the Ansible console.
       debug:
         msg: "Current free disk space on {{ inventory_hostname }}: {{ freespace.stdout }} GB"
 
     - name: Check if disk space is below threshold
+      # This block checks if the free disk space is below 20 GB and handles the situation.
       block:
         - name: Prepare failure message
+          # This task sets a fact with a detailed message about insufficient disk space.
           set_fact:
             disk_space_message: >-
               VM {{ inventory_hostname }} has insufficient disk space. 
@@ -21,10 +26,12 @@
               which is below the required 20 GB threshold.
 
         - name: Output detailed disk space warning
+          # This task outputs the detailed disk space warning message to the Ansible console.
           debug:
             msg: "{{ disk_space_message }}"
 
         - name: Fail play if disk space is insufficient
+          # This task fails the play if the free disk space is below 20 GB, using the detailed message prepared earlier.
           fail:
             msg: "{{ disk_space_message }}"
       when: freespace.stdout | float < 20.0
